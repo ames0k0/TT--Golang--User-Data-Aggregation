@@ -33,6 +33,11 @@ type UserSubscriptions struct {
 	End_date *string `json:"end_date"`
 }
 
+type UserSubscriptionsTotalCost struct {
+	ServicesCount int `json:"services_count"`
+	ServicesTotalPrice int `json:"services_total_price"`
+}
+
 // TODO (ames0k0): sId :: string -> UUID
 func main() {
 	// LOGGING init
@@ -50,9 +55,9 @@ func main() {
 
 	app := &application{logger: logger, dbpool: dbpool}
 
+	http.HandleFunc("/subscriptions/calc-total-cost/", app.subscriptionsCalcTotalCostHandler)
+	http.HandleFunc("/subscriptions/list/", app.subscriptionsListHandler)
 	http.HandleFunc("/subscriptions/", app.subscriptionsHandler)
-	http.HandleFunc("/subscriptions/list", app.subscriptionsListHandler)
-	http.HandleFunc("/subscriptions/calc-total-costs/", app.subscriptionsCalcTotalCostsHandler)
 
 	if err := http.ListenAndServe(":8080", nil); err != nil && err != http.ErrServerClosed {
 		app.logger.Error(
@@ -138,7 +143,11 @@ func queryParamsLoader(w http.ResponseWriter, r *http.Request, requiredQP []stri
 	}
 
 	if len(rMRQP) > 0 {
-		http.Error(w, "Missing required params: " + strings.Join(rMRQP, ","), http.StatusBadRequest)
+		http.Error(
+			w,
+			"Missing required params: " + strings.Join(rMRQP, ", "),
+			http.StatusBadRequest,
+		)
 		return rRQP, rOQP, errors.New("Missing required params")
 	}
 
@@ -360,12 +369,59 @@ func (app *application) subscriptionsListHandler(w http.ResponseWriter, r *http.
 	}
 }
 
-func (app *application) subscriptionsCalcTotalCostsHandler(w http.ResponseWriter, r *http.Request) {
-	queryParams := r.URL.Query()
-	userId := queryParams.Get("userId")
-	if userId == "" {
-		http.Error(w, "Name parameter is required (`userId`)", http.StatusBadRequest)
+func (app *application) subscriptionsCalcTotalCostHandler(w http.ResponseWriter, r *http.Request) {
+	requiredQP := []string{"user_id", "service_name", "start_date", "end_date"}
+	optionalQP := []string{}
+	rRQP, _, err := queryParamsLoader(w, r, requiredQP, optionalQP)
+
+	if err != nil {
 		return
 	}
-	fmt.Fprintf(w, "CalcTotalCosts, I love %s!", r.URL.Path[1:])
+
+	var user_subscriptions_total_cost UserSubscriptionsTotalCost
+
+	query := `
+	SELECT
+		count(id), sum(price) FROM user_subscriptions
+	WHERE
+		user_id = $1 AND
+		service_name = $2 AND
+		start_date = $3 AND
+		(
+			end_date IS NULL OR end_date <= $4
+		)
+	`
+
+	err = app.dbpool.QueryRow(
+		context.Background(),
+		query,
+		rRQP["user_id"],
+		rRQP["service_name"],
+		rRQP["start_date"],
+		rRQP["end_date"],
+	).Scan(
+		&user_subscriptions_total_cost.ServicesCount,
+		&user_subscriptions_total_cost.ServicesTotalPrice,
+	)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	err = json.NewEncoder(w).Encode(user_subscriptions_total_cost)
+
+	if err != nil {
+		http.Error(
+			w,
+			"Could not json.encode([]UserSubscriptionsTotalCost)",
+			http.StatusInternalServerError,
+		)
+		app.logger.Error(
+			"Could not json.encode([]UserSubscriptionsTotalCost)",
+			"err",
+			err.Error(),
+			"user_subscriptions_total_cost",
+			user_subscriptions_total_cost,
+		)
+		return
+	}
 }

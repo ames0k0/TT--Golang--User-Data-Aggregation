@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	// TODO (ames0k0): Use log/slog
 	"log"
 	"log/slog"
 	"net/http"
@@ -71,7 +73,7 @@ func main() {
 func (app *application) subscriptionsHandler(w http.ResponseWriter, r *http.Request) {
 	var user_subscription UserSubscriptions
 
-	// TODO (ames0k0): PG.Get
+	// XXX (ames0k0): Data Preload (validation)
 	if (r.Method != http.MethodPost) {
 		requiredQP := []string{"id"}
 		optionalQP := []string{}
@@ -121,7 +123,13 @@ func (app *application) subscriptionsHandler(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func queryParamsLoader(w http.ResponseWriter, r *http.Request, requiredQP []string, optionalQP[]string) (map[string]string, map[string]string, error) {
+func queryParamsLoader(
+	w http.ResponseWriter, r *http.Request,
+	requiredQP []string, optionalQP[]string,
+) (
+	map[string]string, map[string]string,
+	error,
+) {
 	rRQP := make(map[string]string)
 	rOQP := make(map[string]string)
 	var rMRQP []string
@@ -129,7 +137,7 @@ func queryParamsLoader(w http.ResponseWriter, r *http.Request, requiredQP []stri
 	queryParams := r.URL.Query()
 
 	for _, key := range requiredQP {
-		value := queryParams.Get(key)
+		value := strings.TrimSpace(queryParams.Get(key))
 		if value == "" {
 			rMRQP = append(rMRQP, key)
 		} else {
@@ -138,7 +146,7 @@ func queryParamsLoader(w http.ResponseWriter, r *http.Request, requiredQP []stri
 	}
 
 	for _, key := range optionalQP {
-		value := queryParams.Get(key)
+		value := strings.TrimSpace(queryParams.Get(key))
 		rOQP[key] = value
 	}
 
@@ -152,6 +160,78 @@ func queryParamsLoader(w http.ResponseWriter, r *http.Request, requiredQP []stri
 	}
 
 	return rRQP, rOQP, nil
+}
+
+
+func formValuesLoader(
+	w http.ResponseWriter, r *http.Request,
+	app *application,
+	requiredFV []string, optionalFV[]string,
+) (
+	map[string]string,
+	map[string]interface{},
+	error,
+) {
+	rRFV := make(map[string]string)
+	rOFV := make(map[string]interface{})
+	var rMRFV []string
+
+	err := r.ParseForm()
+	if err != nil {
+		errMsg := "Could not parse request.Form: " + r.Method
+		http.Error(
+			w,
+			errMsg,
+			http.StatusBadRequest,
+		)
+		app.logger.Error(
+			errMsg,
+			"err",
+			err.Error(),
+			"request.Form",
+			r.Form,
+		)
+		return rRFV, rOFV, errors.New(errMsg)
+	}
+
+	for _, key := range requiredFV {
+		value := strings.TrimSpace(r.FormValue(key))
+		if value == "" {
+			rMRFV = append(rMRFV, key)
+		} else {
+			rRFV[key] = value
+		}
+	}
+
+	if len(rMRFV) > 0 {
+		errMsg := "Missing required form data: " + strings.Join(rMRFV, ", ")
+		http.Error(
+			w,
+			errMsg,
+			http.StatusBadRequest,
+		)
+		app.logger.Error(
+			errMsg,
+			"request.form",
+			r.Form,
+		)
+		return rRFV, rOFV, errors.New(errMsg)
+	}
+
+	for _, key := range optionalFV {
+		value := strings.TrimSpace(r.FormValue(key))
+		if value == "" {
+			rOFV[key] = sql.NullString{
+				String: r.FormValue("end_date"), Valid: false,
+			}
+		} else {
+			rOFV[key] = sql.NullString{
+				String: r.FormValue("end_date"), Valid: true,
+			}
+		}
+	}
+
+	return rRFV, rOFV, nil
 }
 
 func (app *application) subscriptionsCreateHandler(w http.ResponseWriter, r *http.Request) {
@@ -258,23 +338,67 @@ func (app *application) subscriptionsReadHandler(w http.ResponseWriter, _ *http.
 	}
 }
 
-func (app *application) subscriptionsUpdateHandler(w http.ResponseWriter, r *http.Request, user_subscription UserSubscriptions) {
-	requiredQP := []string{"subscription_id"}
-	optionalQP := []string{"user_id", "service_name", "price", "start_date", "end_date"}
-	rRQP, rOQP, err := queryParamsLoader(w, r, requiredQP, optionalQP)
-	_ = rRQP
-	_ = rOQP
+func (app *application) subscriptionsUpdateHandler(
+	w http.ResponseWriter, r *http.Request,
+	user_subscription UserSubscriptions,
+) {
+	requiredFV := []string{"user_id", "service_name", "price", "start_date"}
+	optionalFV := []string{"end_date"}
+
+	rRFV, rOFV, err := formValuesLoader(
+		w, r, app, requiredFV, optionalFV,
+	)
 
 	if err != nil {
 		return
 	}
 
-	// TODO (ames0k0): PG.Update
-	fmt.Fprintf(w, "Update, I love %s!", r.URL.Path[1:])
+	query := `
+	UPDATE user_subscriptions
+	SET
+		user_id = $2,
+		service_name = $3,
+		price = $4,
+		start_date = $5,
+		end_date = $6
+	WHERE
+		id = $1
+	`
+
+	_, err = app.dbpool.Exec(
+		context.Background(),
+		query,
+		user_subscription.Id,
+		rRFV["user_id"],
+		rRFV["service_name"],
+		rRFV["price"],
+		rRFV["start_date"],
+		rOFV["end_date"],
+	)
+
+	if err != nil {
+		errMsg := "Could not dbpool.Exec(Update)"
+		http.Error(
+			w,
+			errMsg,
+			http.StatusInternalServerError,
+		)
+		app.logger.Error(
+			errMsg,
+			"err",
+			err.Error(),
+			"request.Form",
+			r.Form,
+		)
+		return
+	}
 }
 
 
-func (app *application) subscriptionsDeleteHandler(w http.ResponseWriter, _ *http.Request, user_subscription UserSubscriptions) {
+func (app *application) subscriptionsDeleteHandler(
+	w http.ResponseWriter, _ *http.Request,
+	user_subscription UserSubscriptions,
+) {
 	query := `DELETE FROM user_subscriptions WHERE id = $1`
 
 	_, err := app.dbpool.Exec(
@@ -284,8 +408,9 @@ func (app *application) subscriptionsDeleteHandler(w http.ResponseWriter, _ *htt
 	)
 
 	if err != nil {
-		http.Error(w, "Could not dbpool.Exec(Delete)", http.StatusInternalServerError)
-		app.logger.Error("Could not dbpool.Exec(Delete)", "err", err.Error())
+		errMsg := "Could not dbpool.Exec(Delete)"
+		http.Error(w, errMsg, http.StatusInternalServerError)
+		app.logger.Error(errMsg, "err", err.Error())
 		return
 	}
 }

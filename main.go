@@ -3,10 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 
-	// TODO (ames0k0): Use log/slog
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -49,10 +46,14 @@ func main() {
 	// dbpool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
 	dbpool, err := pgxpool.New(context.Background(), "postgresql://postgres:simple@localhost:5454/templates__postgres")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to create connection pool: %v\n", err)
+		logger.Error(
+			"Unable to create pg connection pool",
+			"err",
+			err.Error(),
+		)
 		os.Exit(1)
 	}
-	fmt.Fprintf(os.Stdout, "Connected to the database\n")
+	logger.Info("Connected to the database.")
 	defer dbpool.Close()
 
 	app := &application{logger: logger, dbpool: dbpool}
@@ -77,7 +78,7 @@ func (app *application) subscriptionsHandler(w http.ResponseWriter, r *http.Requ
 	if (r.Method != http.MethodPost) {
 		requiredQP := []string{"id"}
 		optionalQP := []string{}
-		rRQP, _, err := queryParamsLoader(w, r, requiredQP, optionalQP)
+		rRQP, _, err := queryParamsLoader(w, r, app, requiredQP, optionalQP)
 
 		if err != nil {
 			return
@@ -125,6 +126,7 @@ func (app *application) subscriptionsHandler(w http.ResponseWriter, r *http.Requ
 
 func queryParamsLoader(
 	w http.ResponseWriter, r *http.Request,
+	app *application,
 	requiredQP []string, optionalQP[]string,
 ) (
 	map[string]string, map[string]string,
@@ -151,12 +153,18 @@ func queryParamsLoader(
 	}
 
 	if len(rMRQP) > 0 {
+		errMsg := "Missing required params: " + strings.Join(rMRQP, ", ")
 		http.Error(
 			w,
-			"Missing required params: " + strings.Join(rMRQP, ", "),
+			errMsg,
 			http.StatusBadRequest,
 		)
-		return rRQP, rOQP, errors.New("Missing required params")
+		app.logger.Error(
+			errMsg,
+			"request.Form",
+			r.Form,
+		)
+		return rRQP, rOQP, errors.New(errMsg)
 	}
 
 	return rRQP, rOQP, nil
@@ -237,13 +245,14 @@ func formValuesLoader(
 func (app *application) subscriptionsCreateHandler(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
+		errMsg := "Could not parse request.Form"
 		http.Error(
 			w,
-			"Could not parse request.Form",
+			errMsg,
 			http.StatusBadRequest,
 		)
 		app.logger.Error(
-			"Could not parse request.Form",
+			errMsg,
 			"err",
 			err.Error(),
 			"request.Form",
@@ -263,13 +272,14 @@ func (app *application) subscriptionsCreateHandler(w http.ResponseWriter, r *htt
 	}
 
 	if len(rMRFD) > 0 {
+		errMsg := "Missing required form data: " + strings.Join(rMRFD, ", ")
 		http.Error(
 			w,
-			"Missing required form data: " + strings.Join(rMRFD, ", "),
+			errMsg,
 			http.StatusBadRequest,
 		)
 		app.logger.Error(
-			"Missing required form data: " + strings.Join(rMRFD, ", "),
+			errMsg,
 			"request.form",
 			r.Form,
 		)
@@ -300,13 +310,14 @@ func (app *application) subscriptionsCreateHandler(w http.ResponseWriter, r *htt
 	)
 
 	if err != nil {
+		errMsg := "Could not dbpool.Exec(Insert)"
 		http.Error(
 			w,
-			"Could not dbpool.Exec(Insert)",
+			errMsg,
 			http.StatusInternalServerError,
 		)
 		app.logger.Error(
-			"Could not dbpool.Exec(Insert)",
+			errMsg,
 			"err",
 			err.Error(),
 			"request.Form",
@@ -322,13 +333,14 @@ func (app *application) subscriptionsReadHandler(w http.ResponseWriter, _ *http.
 
 	err := json.NewEncoder(w).Encode(user_subscription)
 	if err != nil {
+		errMsg := "Could not json.encode(UserSubscriptions)"
 		http.Error(
 			w,
-			"Could not json.encode(UserSubscriptions)",
+			errMsg,
 			http.StatusInternalServerError,
 		)
 		app.logger.Error(
-			"Could not json.encode(UserSubscriptions)",
+			errMsg,
 			"err",
 			err.Error(),
 			"user_subscription",
@@ -429,7 +441,17 @@ func (app *application) subscriptionsListHandler(w http.ResponseWriter, r *http.
 		result_limit,
 	)
 	if err != nil {
-		log.Fatal(err)
+		errMsg := "Could select data from table 'user_subscriptions'"
+		http.Error(
+			w,
+			errMsg,
+			http.StatusInternalServerError,
+		)
+		app.logger.Error(
+			errMsg,
+			"err",
+			err.Error(),
+		)
 	}
 	defer rows.Close()
 
@@ -444,13 +466,14 @@ func (app *application) subscriptionsListHandler(w http.ResponseWriter, r *http.
 			&user_subscription.End_date,
 		)
 		if err != nil {
+			errMsg := "Could not dbpool.Query(List.Load)"
 			http.Error(
 				w,
-				"Could not dbpool.Query(List.Load)",
+				errMsg,
 				http.StatusInternalServerError,
 			)
 			app.logger.Error(
-				"Could not dbpool.Query(List.Load)",
+				errMsg,
 				"err",
 				err.Error(),
 			)
@@ -460,13 +483,14 @@ func (app *application) subscriptionsListHandler(w http.ResponseWriter, r *http.
 
 	err = rows.Err()
 	if err != nil {
+		errMsg := "Could not dbpool.Query(Rows)"
 		http.Error(
 			w,
-			"Could not dbpool.Query(Rows)",
+			errMsg,
 			http.StatusInternalServerError,
 		)
 		app.logger.Error(
-			"Could not dbpool.Query(Rows)",
+			errMsg,
 			"err",
 			err.Error(),
 		)
@@ -478,13 +502,14 @@ func (app *application) subscriptionsListHandler(w http.ResponseWriter, r *http.
 	err = json.NewEncoder(w).Encode(users_subscriptions)
 
 	if err != nil {
+		errMsg := "Could not json.encode([]UserSubscriptions)"
 		http.Error(
 			w,
-			"Could not json.encode([]UserSubscriptions)",
+			errMsg,
 			http.StatusInternalServerError,
 		)
 		app.logger.Error(
-			"Could not json.encode([]UserSubscriptions)",
+			errMsg,
 			"err",
 			err.Error(),
 			"users_subscriptions",
@@ -497,7 +522,7 @@ func (app *application) subscriptionsListHandler(w http.ResponseWriter, r *http.
 func (app *application) subscriptionsCalcTotalCostHandler(w http.ResponseWriter, r *http.Request) {
 	requiredQP := []string{"user_id", "service_name", "start_date", "end_date"}
 	optionalQP := []string{}
-	rRQP, _, err := queryParamsLoader(w, r, requiredQP, optionalQP)
+	rRQP, _, err := queryParamsLoader(w, r, app, requiredQP, optionalQP)
 
 	if err != nil {
 		return
@@ -535,13 +560,14 @@ func (app *application) subscriptionsCalcTotalCostHandler(w http.ResponseWriter,
 	err = json.NewEncoder(w).Encode(user_subscriptions_total_cost)
 
 	if err != nil {
+		errMsg := "Could not json.encode([]UserSubscriptionsTotalCost)"
 		http.Error(
 			w,
-			"Could not json.encode([]UserSubscriptionsTotalCost)",
+			errMsg,
 			http.StatusInternalServerError,
 		)
 		app.logger.Error(
-			"Could not json.encode([]UserSubscriptionsTotalCost)",
+			errMsg,
 			"err",
 			err.Error(),
 			"user_subscriptions_total_cost",

@@ -1,24 +1,41 @@
 services:
+
+  server:
+    image: user_data_aggregation:v0.1.0
+    container_name: user_data_aggregation--server
+    build: .
+    env_file:
+      - ./secrets/server.env
+    environment:
+      - name=value
+    ports:
+      - 8080:8080
+    depends_on:
+      - db
+    restart: unless-stopped
+    networks:
+      - backend
+
   db:
     image: postgres:13-alpine
-    container_name: templates__postgres
-    environment:
-      POSTGRES_PASSWORD: simple
-      POSTGRES_DB: templates__postgres
-      POSTGRES_USER: postgres
-      PGDATA: /var/lib/postgresql/data
+    container_name: user_data_aggregation--db
+    env_file:
+      - ./secrets/db.env
     volumes:
       - ./pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d templates__postgres"]
       interval: 10s
       retries: 5
       start_period: 30s
       timeout: 10s
-    restart: unless-stopped
-    ports:
-      - 5454:5432
+    networks:
+      - backend
 
+networks:
+  backend:
+    driver: bridge
 
 volumes:
   pgdata:

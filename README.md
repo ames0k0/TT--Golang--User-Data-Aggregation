@@ -3,7 +3,6 @@
 Start a Service
 ```bash
 docker compose up -d
-
-go mod tidy
-go build -o main . && ./main
 ```
+
+Visit: [localhost:8080/subscriptions/](http://localhost:8080/subscriptions/)

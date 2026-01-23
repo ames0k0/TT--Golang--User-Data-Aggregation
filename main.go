@@ -43,8 +43,7 @@ func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	// DATABASE connection
-	// dbpool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
-	dbpool, err := pgxpool.New(context.Background(), "postgresql://postgres:simple@localhost:5454/templates__postgres")
+	dbpool, err := pgxpool.New(context.Background(), os.Getenv("DATABASE_URL"))
 	if err != nil {
 		logger.Error(
 			"Unable to create pg connection pool",

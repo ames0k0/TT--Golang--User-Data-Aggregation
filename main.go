@@ -15,26 +15,41 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/pressly/goose/v3"
 )
 
-// XXX (ames0k0): Application Struct ?
 type application struct {
 	logger *slog.Logger
 	dbpool *pgxpool.Pool
 }
 
 type UserSubscriptions struct {
-	Id pgtype.UUID `json:"id"`
-	User_id pgtype.UUID `json:"user_id"`
-	Service_name string `json:"service_name"`
-	Price int `json:"price"`
-	Start_date string `json:"start_date"`
-	End_date *string `json:"end_date"`
+	Id		pgtype.UUID 	`json:"id"`
+	User_id		pgtype.UUID 	`json:"user_id"`
+	Service_name	string		`json:"service_name"`
+	Price		int		`json:"price"`
+	Start_date	string		`json:"start_date"`
+	End_date	*string		`json:"end_date"`
 }
 
 type UserSubscriptionsTotalCost struct {
-	ServicesCount int `json:"services_count"`
-	ServicesTotalPrice int `json:"services_total_price"`
+	ServicesCount		int	`json:"services_count"`
+	ServicesTotalPrice	int	`json:"services_total_price"`
+}
+
+func dbMigrations(dbpool *pgxpool.Pool) {
+	db := stdlib.OpenDBFromPool(dbpool)
+	defer db.Close()
+
+	if err := goose.SetDialect("postgres"); err != nil {
+		panic(err)
+	}
+
+	if err := goose.Up(db, "./migrations"); err != nil {
+		panic(err)
+	}
 }
 
 // TODO (ames0k0): sId :: string -> UUID
@@ -54,6 +69,9 @@ func main() {
 	}
 	logger.Info("Connected to the database.")
 	defer dbpool.Close()
+
+	dbMigrations(dbpool)
+	logger.Info("Database mirations are completed.")
 
 	app := &application{logger: logger, dbpool: dbpool}
 
@@ -322,7 +340,6 @@ func (app *application) subscriptionsCreateHandler(w http.ResponseWriter, r *htt
 			"request.Form",
 			r.Form,
 		)
-		return
 	}
 }
 
@@ -345,7 +362,6 @@ func (app *application) subscriptionsReadHandler(w http.ResponseWriter, _ *http.
 			"user_subscription",
 			user_subscription,
 		)
-		return
 	}
 }
 
@@ -401,7 +417,6 @@ func (app *application) subscriptionsUpdateHandler(
 			"request.Form",
 			r.Form,
 		)
-		return
 	}
 }
 
@@ -422,7 +437,6 @@ func (app *application) subscriptionsDeleteHandler(
 		errMsg := "Could not dbpool.Exec(Delete)"
 		http.Error(w, errMsg, http.StatusInternalServerError)
 		app.logger.Error(errMsg, "err", err.Error())
-		return
 	}
 }
 
@@ -514,7 +528,6 @@ func (app *application) subscriptionsListHandler(w http.ResponseWriter, r *http.
 			"users_subscriptions",
 			users_subscriptions,
 		)
-		return
 	}
 }
 
@@ -572,6 +585,5 @@ func (app *application) subscriptionsCalcTotalCostHandler(w http.ResponseWriter,
 			"user_subscriptions_total_cost",
 			user_subscriptions_total_cost,
 		)
-		return
 	}
 }

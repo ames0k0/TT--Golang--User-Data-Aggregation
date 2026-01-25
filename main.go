@@ -442,7 +442,7 @@ func (app *application) subscriptionsDeleteHandler(
 
 func (app *application) subscriptionsListHandler(w http.ResponseWriter, r *http.Request) {
 	result_limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
-	var users_subscriptions []UserSubscriptions
+	users_subscriptions := []UserSubscriptions{}
 
 	if err != nil || result_limit > 50 {
 		result_limit = 50

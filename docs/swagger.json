@@ -1,0 +1,328 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "REST-сервис для агрегации данных об онлайн-подписках пользователей.",
+        "title": "User Data Aggregation",
+        "contact": {},
+        "version": "0.1.0"
+    },
+    "paths": {
+        "/subscriptions/": {
+            "get": {
+                "description": "Операция по чтение подписки (READ)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Подписки"
+                ],
+                "summary": "Чтение подписки",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "ID подписки",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.UserSubscriptions"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "post": {
+                "description": "Операция по создание подписки (CREATE)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Подписки"
+                ],
+                "summary": "Создание подписки",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "ID пользователя в формате UUID",
+                        "name": "user_id",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Название сервиса, предоставляющего подписку",
+                        "name": "service_name",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Стоимость месячной подписки в рублях",
+                        "name": "price",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "maxLength": 7,
+                        "minLength": 7,
+                        "type": "string",
+                        "description": "Дата начала подписки (месяц и год)",
+                        "name": "start_date",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "maxLength": 7,
+                        "minLength": 7,
+                        "type": "string",
+                        "description": "Опционально дата окончания подписки (месяц и год)",
+                        "name": "end_date",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "delete": {
+                "description": "Операция по удаление подписки (DELETE)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Подписки"
+                ],
+                "summary": "Удаление подписки",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "ID подписки",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "patch": {
+                "description": "Операция по обновление подписки (UPDATE)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Подписки"
+                ],
+                "summary": "Обновление подписки",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "ID подписки",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "ID пользователя в формате UUID",
+                        "name": "user_id",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Название сервиса, предоставляющего подписку",
+                        "name": "service_name",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Стоимость месячной подписки в рублях",
+                        "name": "price",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "maxLength": 7,
+                        "minLength": 7,
+                        "type": "string",
+                        "description": "Дата начала подписки (месяц и год)",
+                        "name": "start_date",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "maxLength": 7,
+                        "minLength": 7,
+                        "type": "string",
+                        "description": "Опционально дата окончания подписки (месяц и год)",
+                        "name": "end_date",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/subscriptions/calc-total-cost": {
+            "get": {
+                "description": "Подсчета суммарной стоимости всех подписок за выбранный период с фильтрацией по id пользователя и названию подписки",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Функции"
+                ],
+                "summary": "Подсчета суммарной стоимости всех подписок",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "ID пользователя в формате UUID",
+                        "name": "user_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Название сервиса, предоставляющего подписку",
+                        "name": "service_name",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "maxLength": 7,
+                        "minLength": 7,
+                        "type": "string",
+                        "description": "Период. Дата начала подписки (месяц и год)",
+                        "name": "start_date",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "maxLength": 7,
+                        "minLength": 7,
+                        "type": "string",
+                        "description": "Период. Дата окончания подписки (месяц и год)",
+                        "name": "end_date",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.UserSubscriptionsTotalCost"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/subscriptions/list": {
+            "get": {
+                "description": "Операция по чтение подписок (LIST)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Подписки"
+                ],
+                "summary": "Чтение подписок",
+                "parameters": [
+                    {
+                        "maximum": 20,
+                        "minimum": 1,
+                        "type": "integer",
+                        "description": "Ограничение количество читаемых данных. Дефолт 20",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.UserSubscriptions"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "main.UserSubscriptions": {
+            "type": "object",
+            "properties": {
+                "end_date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "price": {
+                    "type": "integer"
+                },
+                "service_name": {
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.UserSubscriptionsTotalCost": {
+            "type": "object",
+            "properties": {
+                "services_count": {
+                    "type": "integer"
+                },
+                "services_total_price": {
+                    "type": "integer"
+                }
+            }
+        }
+    }
+}

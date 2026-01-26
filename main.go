@@ -278,7 +278,7 @@ func formValuesLoader(
 // @Description  Операция по создание подписки (CREATE)
 // @Tags         Подписки
 // @Produce      json
-// @Param        user_id       formData  string  true   "ID пользователя в формате UUID"                    format(uuid)
+// @Param        user_id       formData  string  true   "ID пользователя в формате UUID"                     format(uuid)
 // @Param        service_name  formData  string  true   "Название сервиса, предоставляющего подписку"
 // @Param        price         formData  int     true   "Стоимость месячной подписки в рублях"
 // @Param        start_date    formData  string  true   "Дата начала подписки (месяц и год)"                 minlength(7)  maxlength(7)
@@ -287,55 +287,15 @@ func formValuesLoader(
 // @Failure      500  {object}  nil
 // @Router       /subscriptions/ [post]
 func (app *application) subscriptionsCreateHandler(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
+	requiredFV := []string{"user_id", "service_name", "price", "start_date"}
+	optionalFV := []string{"end_date"}
+
+	rRFV, rOFV, err := formValuesLoader(
+		w, r, app, requiredFV, optionalFV,
+	)
+
 	if err != nil {
-		errMsg := "Could not parse request.Form"
-		http.Error(
-			w,
-			errMsg,
-			http.StatusBadRequest,
-		)
-		app.logger.Error(
-			errMsg,
-			"err",
-			err.Error(),
-			"request.Form",
-			r.Form,
-		)
 		return
-	}
-
-	requiredFD := []string{"user_id", "service_name", "price", "start_date"}
-	var rMRFD[]string
-
-	for _, key := range requiredFD {
-		value := r.FormValue(key)
-		if value == "" {
-			rMRFD = append(rMRFD, key)
-		}
-	}
-
-	if len(rMRFD) > 0 {
-		errMsg := "Missing required form data: " + strings.Join(rMRFD, ", ")
-		http.Error(
-			w,
-			errMsg,
-			http.StatusBadRequest,
-		)
-		app.logger.Error(
-			errMsg,
-			"request.form",
-			r.Form,
-		)
-		return
-	}
-
-	var end_date sql.NullString
-
-	if r.FormValue("end_date") == "" {
-		end_date = sql.NullString{String: r.FormValue("end_date"), Valid: false}
-	} else {
-		end_date = sql.NullString{String: r.FormValue("end_date"), Valid: true}
 	}
 
 	query := `
@@ -346,11 +306,11 @@ func (app *application) subscriptionsCreateHandler(w http.ResponseWriter, r *htt
 	_, err = app.dbpool.Exec(
 		context.Background(),
 		query,
-		r.FormValue("user_id"),
-		r.FormValue("service_name"),
-		r.FormValue("price"),
-		r.FormValue("start_date"),
-		end_date,
+		rRFV["user_id"],
+		rRFV["service_name"],
+		rRFV["price"],
+		rRFV["start_date"],
+		rOFV["end_date"],
 	)
 
 	if err != nil {

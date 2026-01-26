@@ -1,0 +1,227 @@
+definitions:
+  main.UserSubscriptions:
+    properties:
+      end_date:
+        type: string
+      id:
+        type: string
+      price:
+        type: integer
+      service_name:
+        type: string
+      start_date:
+        type: string
+      user_id:
+        type: string
+    type: object
+  main.UserSubscriptionsTotalCost:
+    properties:
+      services_count:
+        type: integer
+      services_total_price:
+        type: integer
+    type: object
+info:
+  contact: {}
+  description: REST-сервис для агрегации данных об онлайн-подписках пользователей.
+  title: User Data Aggregation
+  version: 0.1.0
+paths:
+  /subscriptions/:
+    delete:
+      description: Операция по удаление подписки (DELETE)
+      parameters:
+      - description: ID подписки
+        format: uuid
+        in: query
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "500":
+          description: Internal Server Error
+      summary: Удаление подписки
+      tags:
+      - Подписки
+    get:
+      description: Операция по чтение подписки (READ)
+      parameters:
+      - description: ID подписки
+        format: uuid
+        in: query
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.UserSubscriptions'
+        "500":
+          description: Internal Server Error
+      summary: Чтение подписки
+      tags:
+      - Подписки
+    patch:
+      description: Операция по обновление подписки (UPDATE)
+      parameters:
+      - description: ID подписки
+        format: uuid
+        in: query
+        name: id
+        required: true
+        type: string
+      - description: ID пользователя в формате UUID
+        format: uuid
+        in: formData
+        name: user_id
+        required: true
+        type: string
+      - description: Название сервиса, предоставляющего подписку
+        in: formData
+        name: service_name
+        required: true
+        type: string
+      - description: Стоимость месячной подписки в рублях
+        in: formData
+        name: price
+        required: true
+        type: integer
+      - description: Дата начала подписки (месяц и год)
+        in: formData
+        maxLength: 7
+        minLength: 7
+        name: start_date
+        required: true
+        type: string
+      - description: Опционально дата окончания подписки (месяц и год)
+        in: formData
+        maxLength: 7
+        minLength: 7
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "500":
+          description: Internal Server Error
+      summary: Обновление подписки
+      tags:
+      - Подписки
+    post:
+      description: Операция по создание подписки (CREATE)
+      parameters:
+      - description: ID пользователя в формате UUID
+        format: uuid
+        in: formData
+        name: user_id
+        required: true
+        type: string
+      - description: Название сервиса, предоставляющего подписку
+        in: formData
+        name: service_name
+        required: true
+        type: string
+      - description: Стоимость месячной подписки в рублях
+        in: formData
+        name: price
+        required: true
+        type: integer
+      - description: Дата начала подписки (месяц и год)
+        in: formData
+        maxLength: 7
+        minLength: 7
+        name: start_date
+        required: true
+        type: string
+      - description: Опционально дата окончания подписки (месяц и год)
+        in: formData
+        maxLength: 7
+        minLength: 7
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "500":
+          description: Internal Server Error
+      summary: Создание подписки
+      tags:
+      - Подписки
+  /subscriptions/calc-total-cost:
+    get:
+      description: Подсчета суммарной стоимости всех подписок за выбранный период
+        с фильтрацией по id пользователя и названию подписки
+      parameters:
+      - description: ID пользователя в формате UUID
+        format: uuid
+        in: query
+        name: user_id
+        required: true
+        type: string
+      - description: Название сервиса, предоставляющего подписку
+        in: query
+        name: service_name
+        required: true
+        type: string
+      - description: Период. Дата начала подписки (месяц и год)
+        in: query
+        maxLength: 7
+        minLength: 7
+        name: start_date
+        required: true
+        type: string
+      - description: Период. Дата окончания подписки (месяц и год)
+        in: query
+        maxLength: 7
+        minLength: 7
+        name: end_date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.UserSubscriptionsTotalCost'
+        "500":
+          description: Internal Server Error
+      summary: Подсчета суммарной стоимости всех подписок
+      tags:
+      - Функции
+  /subscriptions/list:
+    get:
+      description: Операция по чтение подписок (LIST)
+      parameters:
+      - description: Ограничение количество читаемых данных. Дефолт 20
+        in: query
+        maximum: 20
+        minimum: 1
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.UserSubscriptions'
+            type: array
+        "500":
+          description: Internal Server Error
+      summary: Чтение подписок
+      tags:
+      - Подписки
+swagger: "2.0"

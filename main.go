@@ -13,12 +13,22 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	// XXX (ames0k0): Database
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 
+	// XXX (ames0k0): Migrations
 	"github.com/pressly/goose/v3"
+
+	// XXX (ames0k0): Docs
+	_ "github.com/ames0k0/TT--Golang--User-Data-Aggregation/docs"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
+
+// @title User Data Aggregation
+// @version 0.1.0
+// @description REST-сервис для агрегации данных об онлайн-подписках пользователей.
 
 type application struct {
 	logger *slog.Logger
@@ -52,7 +62,6 @@ func dbMigrations(dbpool *pgxpool.Pool) {
 	}
 }
 
-// TODO (ames0k0): sId :: string -> UUID
 func main() {
 	// LOGGING init
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -75,6 +84,12 @@ func main() {
 
 	app := &application{logger: logger, dbpool: dbpool}
 
+	http.HandleFunc(
+		"GET /swagger/",
+		httpSwagger.Handler(
+			httpSwagger.URL("http://localhost:8080/swagger/doc.json"),
+		),
+	)
 	http.HandleFunc("/subscriptions/calc-total-cost/", app.subscriptionsCalcTotalCostHandler)
 	http.HandleFunc("/subscriptions/list/", app.subscriptionsListHandler)
 	http.HandleFunc("/subscriptions/", app.subscriptionsHandler)
@@ -259,6 +274,18 @@ func formValuesLoader(
 	return rRFV, rOFV, nil
 }
 
+// @Summary      Создание подписки
+// @Description  Операция по создание подписки (CREATE)
+// @Tags         Подписки
+// @Produce      json
+// @Param        user_id       formData  string  true   "ID пользователя в формате UUID"                    format(uuid)
+// @Param        service_name  formData  string  true   "Название сервиса, предоставляющего подписку"
+// @Param        price         formData  int     true   "Стоимость месячной подписки в рублях"
+// @Param        start_date    formData  string  true   "Дата начала подписки (месяц и год)"                 minlength(7)  maxlength(7)
+// @Param        end_date      formData  string  false  "Опционально дата окончания подписки (месяц и год)"  minlength(7)  maxlength(7)
+// @Success      200  {object}  nil
+// @Failure      500  {object}  nil
+// @Router       /subscriptions/ [post]
 func (app *application) subscriptionsCreateHandler(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
@@ -343,6 +370,14 @@ func (app *application) subscriptionsCreateHandler(w http.ResponseWriter, r *htt
 	}
 }
 
+// @Summary      Чтение подписки
+// @Description  Операция по чтение подписки (READ)
+// @Tags         Подписки
+// @Produce      json
+// @Param        id  query  string  true  "ID подписки"  format(uuid)
+// @Success      200  {object}  UserSubscriptions
+// @Failure      500  {object}  nil
+// @Router       /subscriptions/ [get]
 func (app *application) subscriptionsReadHandler(w http.ResponseWriter, _ *http.Request, user_subscription UserSubscriptions) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -365,6 +400,19 @@ func (app *application) subscriptionsReadHandler(w http.ResponseWriter, _ *http.
 	}
 }
 
+// @Summary      Обновление подписки
+// @Description  Операция по обновление подписки (UPDATE)
+// @Tags         Подписки
+// @Produce      json
+// @Param        id            query     string  true   "ID подписки"                                        format(uuid)
+// @Param        user_id       formData  string  true   "ID пользователя в формате UUID"                     format(uuid)
+// @Param        service_name  formData  string  true   "Название сервиса, предоставляющего подписку"
+// @Param        price         formData  int     true   "Стоимость месячной подписки в рублях"
+// @Param        start_date    formData  string  true   "Дата начала подписки (месяц и год)"                 minlength(7)  maxlength(7)
+// @Param        end_date      formData  string  false  "Опционально дата окончания подписки (месяц и год)"  minlength(7)  maxlength(7)
+// @Success      200  {object}  nil
+// @Failure      500  {object}  nil
+// @Router       /subscriptions/ [patch]
 func (app *application) subscriptionsUpdateHandler(
 	w http.ResponseWriter, r *http.Request,
 	user_subscription UserSubscriptions,
@@ -421,6 +469,14 @@ func (app *application) subscriptionsUpdateHandler(
 }
 
 
+// @Summary      Удаление подписки
+// @Description  Операция по удаление подписки (DELETE)
+// @Tags         Подписки
+// @Produce      json
+// @Param        id  query  string  true  "ID подписки"  format(uuid)
+// @Success      200  {object}  nil
+// @Failure      500  {object}  nil
+// @Router       /subscriptions/ [delete]
 func (app *application) subscriptionsDeleteHandler(
 	w http.ResponseWriter, _ *http.Request,
 	user_subscription UserSubscriptions,
@@ -440,12 +496,26 @@ func (app *application) subscriptionsDeleteHandler(
 	}
 }
 
+// @Summary      Чтение подписок
+// @Description  Операция по чтение подписок (LIST)
+// @Tags         Подписки
+// @Produce      json
+// @Param        limit  query  int  false  "Ограничение количество читаемых данных. Дефолт 20"  minimum(1)  maximum(20)
+// @Success      200  {object}  []UserSubscriptions
+// @Failure      500  {object}  nil
+// @Router       /subscriptions/list [get]
 func (app *application) subscriptionsListHandler(w http.ResponseWriter, r *http.Request) {
 	result_limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
-	var users_subscriptions []UserSubscriptions
+	users_subscriptions := []UserSubscriptions{}
 
-	if err != nil || result_limit > 50 {
-		result_limit = 50
+	// XXX (ames0k0): Custom limitation
+	if err != nil {
+		result_limit = 20
+	}
+	if result_limit < 1 {
+		result_limit = 1
+	} else if result_limit > 20 {
+		result_limit = 20
 	}
 
 	rows, err := app.dbpool.Query(
@@ -531,6 +601,17 @@ func (app *application) subscriptionsListHandler(w http.ResponseWriter, r *http.
 	}
 }
 
+// @Summary      Подсчета суммарной стоимости всех подписок
+// @Description  Подсчета суммарной стоимости всех подписок за выбранный период с фильтрацией по id пользователя и названию подписки
+// @Tags         Функции
+// @Produce      json
+// @Param        user_id       query  string  true  "ID пользователя в формате UUID"                 format(uuid)
+// @Param        service_name  query  string  true  "Название сервиса, предоставляющего подписку"
+// @Param        start_date    query  string  true  "Период. Дата начала подписки (месяц и год)"     minlength(7)  maxlength(7)
+// @Param        end_date      query  string  true  "Период. Дата окончания подписки (месяц и год)"  minlength(7)  maxlength(7)
+// @Success      200  {object}  UserSubscriptionsTotalCost
+// @Failure      500  {object}  nil
+// @Router       /subscriptions/calc-total-cost [get]
 func (app *application) subscriptionsCalcTotalCostHandler(w http.ResponseWriter, r *http.Request) {
 	requiredQP := []string{"user_id", "service_name", "start_date", "end_date"}
 	optionalQP := []string{}
